@@ -23,9 +23,19 @@
           <span>
             Message:
           </span>
-          <input name="message" type="text" />
+          <textarea name="message">
+          </textarea>
         </label>
       </form>
     </main>
   </body>
+  <script>
+    const messageField = document.querySelector("textarea");
+    const form = document.querySelector("form");
+    messageField.addEventListener("keyup", function(event) {
+      if (event.keyCode == 13) {
+        form.submit();
+      }
+    })
+  </script>
 </html>

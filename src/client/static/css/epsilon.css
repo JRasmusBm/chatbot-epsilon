@@ -1,8 +1,12 @@
-* { box-sizing: border-box }
+* {
+  box-sizing: border-box;
+}
 
-html, body, main {
+html,
+body,
+main {
   padding: 0;
-  margin: 0; 
+  margin: 0;
   height: 100%;
   width: 100%;
 }
@@ -11,7 +15,12 @@ main {
   background: #f6f6f6;
   display: grid;
   grid-template-rows: 100px calc(100% - 200px) 100px;
+  grid-template-columns: 1fr 100% 1fr;
   padding: 50px;
+}
+
+main > * {
+  grid-column: 2;
 }
 
 article {
@@ -34,4 +43,29 @@ article .them {
   background: lightblue;
   align-self: flex-end;
   border-radius: 20px 0 20px 20px;
+}
+
+label {
+  display: grid;
+  grid-template-columns: 10px 1fr;
+  height: 100%;
+}
+
+label span {
+  grid-column: 2;
+  height: 10px;
+  align-self: center;
+}
+
+label textarea {
+  grid-column: 1 / -1;
+  padding: 10px;
+  font-size: 1.2rem;
+  text-indent: 0;
+}
+
+@media (min-width: 800px) {
+  main {
+    grid-template-columns: 1fr 60% 1fr;
+  }
 }
