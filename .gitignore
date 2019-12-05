@@ -7,3 +7,4 @@ data/
 .tmux
 .vector_cache
 tut1-model.pt
+trained_models/
