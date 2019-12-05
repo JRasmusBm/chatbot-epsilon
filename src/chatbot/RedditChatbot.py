@@ -2,35 +2,39 @@ import nltk
 #nltk.download('punkt')
 import random
 import string
+import sqlite3
 
-import bs4 as bs
-import urllib.request
-import re
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-raw_html = urllib.request.urlopen('https://en.wikipedia.org/wiki/Tennis')
-#raw_html = urllib.request.urlopen('https://en.wikipedia.org/wiki/Artificial_intelligence')
+conn = sqlite3.connect('reddit_comments.db')
+c = conn.cursor()
 
-raw_html = raw_html.read()
-article_html = bs.BeautifulSoup(raw_html, 'lxml')
 
-article_paragraphs = article_html.find_all('p')
+c.execute("SELECT parent, comment FROM parent_reply WHERE subreddit='funny'")
 
-article_text = ''
 
-for para in article_paragraphs:
-    article_text += para.text
+inp = [(parent.lower(), comment.lower()) for (parent, comment) in c.fetchall() if parent is not None and comment is not None]
+#print(input[600])
 
-article_text = article_text.lower()
 
-article_text = re.sub(r'\[[0-9]*\]', ' ', article_text)
-article_text = re.sub(r'\s+', ' ', article_text)
+reference_text = ''
+reference_sentences = []
+for p, _ in inp:
+    reference_sentences.append(p)
+    reference_text += p
 
-article_sentences = nltk.sent_tokenize(article_text)
-article_words = nltk.word_tokenize(article_text)
+
+
+
+#reference_text = re.sub(r'\[[0-9]*\]', ' ', reference_text)
+#reference_text = re.sub(r'\s+', ' ', reference_text)
+
+
+corpus = nltk.word_tokenize(reference_text)
+
 
 wnlemmatizer = nltk.stem.WordNetLemmatizer()
 
@@ -53,10 +57,10 @@ def generate_greeting_response(greeting):
 
 def generate_response(user_input):
     Redditor_response = ''
-    article_sentences.append(user_input)
+    reference_sentences.append(user_input)
 
     word_vectorizer = TfidfVectorizer(tokenizer=get_processed_text, stop_words='english')
-    all_word_vectors = word_vectorizer.fit_transform(article_sentences)
+    all_word_vectors = word_vectorizer.fit_transform(reference_sentences)
     similar_vector_values = cosine_similarity(all_word_vectors[-1], all_word_vectors)
     similar_sentence_number = similar_vector_values.argsort()[0][-2]
     matched_vector = similar_vector_values.flatten()
@@ -67,11 +71,11 @@ def generate_response(user_input):
         Redditor_response = Redditor_response + "I am sorry, I could not understand you"
         return Redditor_response
     else:
-        Redditor_response = Redditor_response + article_sentences[similar_sentence_number]
+        Redditor_response = Redditor_response + str(inp[similar_sentence_number][1])
         return Redditor_response
 
 word_vectorizer = TfidfVectorizer(tokenizer=get_processed_text, stop_words='english')
-all_word_vectors = word_vectorizer.fit_transform(article_sentences)
+all_word_vectors = word_vectorizer.fit_transform(reference_sentences)
 
 similar_vector_values = cosine_similarity(all_word_vectors[-1], all_word_vectors)
 
@@ -79,6 +83,7 @@ similar_sentence_number = similar_vector_values.argsort()[0][-2]
 
 continue_dialogue = True
 print("Hello, I am your friend Redditor. You can ask me anything:")
+
 while(continue_dialogue == True):
     human_text = input()
     human_text = human_text.lower()
@@ -92,7 +97,7 @@ while(continue_dialogue == True):
             else:
                 print("Redditor: ", end="")
                 print(generate_response(human_text))
-                article_sentences.remove(human_text)
+                reference_sentences.remove(human_text)
     else:
         continue_dialogue = False
         print("Redditor: Good bye and take care of yourself...")
