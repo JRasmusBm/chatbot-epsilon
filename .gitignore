@@ -9,3 +9,4 @@ data/
 trained_models/
 *.pt
 *.db
+src/chatbot/train-v2.0.json
