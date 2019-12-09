@@ -3,6 +3,7 @@ from random import choice
 
 from flask import Flask, render_template, request
 
+from src.chatbot.chatbot import generate_response
 from src.sentiment.sentiment import Sentiment
 
 QUESTION_TURN = "QUESTION"
@@ -15,13 +16,9 @@ turn = QUESTION_TURN
 
 def new_prompt():
     prompts = [
-        "Ask me anything!",
+        "Name a tennis-related topic.",
     ]
     return choice(prompts)
-
-
-def answer_question(question):
-    return "Blah... blah..."
 
 
 def create_app(test_config=None):
@@ -48,13 +45,11 @@ def create_app(test_config=None):
         global messages
         global turn
         if request.method == "POST":
-            messages.append(dict(sender="me", text=request.form["message"]))
+            message = request.form["message"].strip()
+            messages.append(dict(sender="me", text=message))
             if turn == QUESTION_TURN:
                 messages.append(
-                    dict(
-                        sender="them",
-                        text=answer_question(request.form["message"]),
-                    )
+                    dict(sender="them", text=generate_response(message),)
                 )
                 messages.append(
                     dict(
@@ -64,11 +59,15 @@ def create_app(test_config=None):
                 )
                 turn = REVIEW_TURN
             else:
+                score = sentiment.eval(message)
+                messages.append(
+                    dict(sender="them", text=f"Sentiment Score: {score}")
+                )
                 messages.append(
                     dict(
                         sender="them",
                         text="I am sorry that you feel that way..."
-                        if sentiment.eval(request.form["message"]) < 0.5
+                        if score < 0.5
                         else "That is great to hear!",
                     )
                 )
