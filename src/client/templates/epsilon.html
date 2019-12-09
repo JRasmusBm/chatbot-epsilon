@@ -12,7 +12,7 @@
   </head>
   <body>
     <main>
-      <h1>Epsilon - The Sympatic Chatbot</h1>
+      <h1>Epsilon - The Sympatic Encyclopaedia</h1>
       <article>
         {% for message in messages %}
           <p class="message {{message.sender}}">{{message.text}}</p>
@@ -30,6 +30,8 @@
     </main>
   </body>
   <script>
+    var article = document.querySelector("article");
+    article.scrollTop = article.scrollHeight;
     const messageField = document.querySelector("textarea");
     const form = document.querySelector("form");
     messageField.addEventListener("keyup", function(event) {

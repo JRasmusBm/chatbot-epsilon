@@ -5,3 +5,6 @@ __pycache__/
 venv/
 data/
 .tmux
+.vector_cache/
+trained_models/
+*.pt
