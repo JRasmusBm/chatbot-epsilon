@@ -6,6 +6,9 @@ venv/
 data/
 .tmux
 .vector_cache/
+.vectors_cache/
+.nvimlog
+.data
 trained_models/
 *.pt
 *.db

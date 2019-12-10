@@ -3,7 +3,7 @@
 set -e
 
 export FLASK_APP=app
-export FLASK_ENV=development
+export FLASK_ENV=production
 
 teardown() {
   cd ../..
@@ -17,5 +17,17 @@ trap_ctrlc() {
 trap "trap_ctrlc" 2
 
 cd src/client
-nodemon -e "py" --exec "flask run"
+
+if [ $# -eq 0 ]
+  then
+    flask run
+  else
+    if echo $* | grep -e "--watch" -q
+    then
+      nodemon -e "py" --exec "flask run"
+    else
+      flask run
+    fi
+fi
+
 teardown

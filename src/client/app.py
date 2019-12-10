@@ -12,6 +12,7 @@ REVIEW_TURN = "REVIEW"
 messages = []
 trained_models_folder = "../../trained_models"
 turn = QUESTION_TURN
+error_margin = 0.05
 
 
 def new_prompt():
@@ -24,9 +25,7 @@ def new_prompt():
 def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_mapping(SECRET_KEY="dev")
-    sentiment = Sentiment(
-        f"{trained_models_folder}/cnn_10_epochs_given_dataset.pt"
-    )
+    sentiment = Sentiment(f"{trained_models_folder}/cnn_20_epochs_imdb.pt")
 
     if test_config is None:
         app.config.from_pyfile("config.py", silent=True)
@@ -54,7 +53,7 @@ def create_app(test_config=None):
                 messages.append(
                     dict(
                         sender="them",
-                        text="What do you think about my response?",
+                        text="How do you feel about my response?",
                     )
                 )
                 turn = REVIEW_TURN
@@ -63,16 +62,28 @@ def create_app(test_config=None):
                 messages.append(
                     dict(sender="them", text=f"Sentiment Score: {score}")
                 )
-                messages.append(
-                    dict(
-                        sender="them",
-                        text="I am sorry that you feel that way..."
-                        if score < 0.5
-                        else "That is great to hear!",
+                if score < 0.5 - error_margin:
+                    messages.append(
+                        dict(
+                            sender="them",
+                            text="I am sorry that you feel that way...",
+                        )
                     )
-                )
-                messages.append(dict(sender="them", text=new_prompt()))
-                turn = QUESTION_TURN
+                    messages.append(dict(sender="them", text=new_prompt()))
+                    turn = QUESTION_TURN
+                elif 0.5 - error_margin <= score <= 0.5 + error_margin:
+                    messages.append(
+                        dict(
+                            sender="them",
+                            text="Don't be shy, tell me what you really think!",
+                        )
+                    )
+                else:
+                    messages.append(
+                        dict(sender="them", text="That is great to hear!",)
+                    )
+                    messages.append(dict(sender="them", text=new_prompt()))
+                    turn = QUESTION_TURN
         elif request.method == "GET":
             message = new_prompt()
             messages = [dict(sender="them", text=message)]

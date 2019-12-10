@@ -5,10 +5,12 @@ pylint: disable=invalid-name
 import random
 
 import numpy as np
+import nltk
 import spacy
 import torch
 import torch.nn as nn
 from torchtext import data
+from torchtext import datasets
 
 SEED = 1234
 
@@ -17,10 +19,11 @@ np.random.seed(SEED)
 torch.manual_seed(SEED)
 torch.backends.cudnn.deterministic = True
 
+# nltk.download("stopwords")
 nlp = spacy.load("en")
 
 data_folder = "../../data"
-json_file = f"{data_folder}/amazon_cells_labelled.json"
+# json_file = f"{data_folder}/amazon_cells_labelled.json"
 
 
 class CNN(nn.Module):
@@ -92,18 +95,19 @@ class Sentiment:
         self.fields = dict(
             text=("text", self.TEXT), label=("label", self.LABEL),
         )
-        dataset = data.TabularDataset(
-            path=json_file, format="json", fields=self.fields
+        print("SPLITTING DATA")
+        training_data, test_data = datasets.IMDB.splits(self.TEXT, self.LABEL)
+        training_data, validation_data = training_data.split(
+            random_state=random.seed(SEED)
         )
-        training_data, _, _ = dataset.split(
-            split_ratio=[0.7, 0.2, 0.1], random_state=random.seed(SEED)
-        )
+        print("BUILDING VOCAB")
         self.TEXT.build_vocab(
             training_data,
             vectors="glove.6B.100d",
             unk_init=torch.Tensor.normal_,
             max_size=MAX_VOCAB_SIZE,
         )
+        print("DONE BUILDING VOCAB")
         self.LABEL.build_vocab(training_data)
         INPUT_DIM = len(self.TEXT.vocab)
         EMBEDDING_DIM = 100
@@ -129,11 +133,11 @@ class Sentiment:
 
     def eval(self, sentence, min_len=5):
         self.model.eval()
+        if len(sentence.split(" ")) < min_len:
+            sentence += " a" * (min_len - len(sentence.split(" ")))
         tokenized = [tok.text for tok in nlp.tokenizer(sentence)]
-        if len(tokenized) < min_len:
-            tokenized += ["<pad>" * (min_len - len(tokenized) + 1)]
         indexed = [self.TEXT.vocab.stoi[t] for t in tokenized]
         tensor = torch.LongTensor(indexed).to(self.device)
         tensor = tensor.unsqueeze(0)
         prediction = torch.sigmoid(self.model(tensor))
-        return 1 - prediction.item()
+        return prediction.item()
