@@ -1,7 +1,7 @@
 import os
 from random import choice
 
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, session
 
 from src.chatbot.chatbot import generate_response
 from src.sentiment.sentiment import Sentiment
@@ -9,7 +9,6 @@ from src.sentiment.sentiment import Sentiment
 QUESTION_TURN = "QUESTION"
 REVIEW_TURN = "REVIEW"
 
-messages = []
 trained_models_folder = "../../trained_models"
 turn = QUESTION_TURN
 error_margin = 0.05
@@ -41,16 +40,15 @@ def create_app(test_config=None):
     # a simple page that says hello
     @app.route("/", methods=["GET", "POST"])
     def epsilon():  # pylint: disable=unused-variable
-        global messages
         global turn
         if request.method == "POST":
             message = request.form["message"].strip()
-            messages.append(dict(sender="me", text=message))
+            session["messages"].append(dict(sender="me", text=message))
             if turn == QUESTION_TURN:
-                messages.append(
+                session["messages"].append(
                     dict(sender="them", text=generate_response(message),)
                 )
-                messages.append(
+                session["messages"].append(
                     dict(
                         sender="them",
                         text="How do you feel about my response?",
@@ -59,36 +57,40 @@ def create_app(test_config=None):
                 turn = REVIEW_TURN
             else:
                 score = sentiment.eval(message)
-                messages.append(
+                session["messages"].append(
                     dict(sender="them", text=f"Sentiment Score: {score}")
                 )
                 if score < 0.5 - error_margin:
-                    messages.append(
+                    session["messages"].append(
                         dict(
                             sender="them",
                             text="I am sorry that you feel that way...",
                         )
                     )
-                    messages.append(dict(sender="them", text=new_prompt()))
+                    session["messages"].append(
+                        dict(sender="them", text=new_prompt())
+                    )
                     turn = QUESTION_TURN
                 elif 0.5 - error_margin <= score <= 0.5 + error_margin:
-                    messages.append(
+                    session["messages"].append(
                         dict(
                             sender="them",
                             text="Don't be shy, tell me what you really think!",
                         )
                     )
                 else:
-                    messages.append(
+                    session["messages"].append(
                         dict(sender="them", text="That is great to hear!",)
                     )
-                    messages.append(dict(sender="them", text=new_prompt()))
+                    session["messages"].append(
+                        dict(sender="them", text=new_prompt())
+                    )
                     turn = QUESTION_TURN
         elif request.method == "GET":
             message = new_prompt()
-            messages = [dict(sender="them", text=message)]
+            session["messages"] = [dict(sender="them", text=message)]
 
-        return render_template("epsilon.html", messages=messages)
+        return render_template("epsilon.html", messages=session["messages"])
 
     return app
 
