@@ -10,7 +10,6 @@ QUESTION_TURN = "QUESTION"
 REVIEW_TURN = "REVIEW"
 
 trained_models_folder = "../../trained_models"
-turn = QUESTION_TURN
 error_margin = 0.05
 
 
@@ -40,11 +39,10 @@ def create_app(test_config=None):
     # a simple page that says hello
     @app.route("/", methods=["GET", "POST"])
     def epsilon():  # pylint: disable=unused-variable
-        global turn
         if request.method == "POST":
             message = request.form["message"].strip()
             session["messages"].append(dict(sender="me", text=message))
-            if turn == QUESTION_TURN:
+            if session["turn"] == QUESTION_TURN:
                 session["messages"].append(
                     dict(sender="them", text=generate_response(message),)
                 )
@@ -54,7 +52,7 @@ def create_app(test_config=None):
                         text="How do you feel about my response?",
                     )
                 )
-                turn = REVIEW_TURN
+                session["turn"] = REVIEW_TURN
             else:
                 score = sentiment.eval(message)
                 session["messages"].append(
@@ -70,7 +68,7 @@ def create_app(test_config=None):
                     session["messages"].append(
                         dict(sender="them", text=new_prompt())
                     )
-                    turn = QUESTION_TURN
+                    session["turn"] = QUESTION_TURN
                 elif 0.5 - error_margin <= score <= 0.5 + error_margin:
                     session["messages"].append(
                         dict(
@@ -89,6 +87,7 @@ def create_app(test_config=None):
         elif request.method == "GET":
             message = new_prompt()
             session["messages"] = [dict(sender="them", text=message)]
+            session["turn"] = QUESTION_TURN
 
         return render_template("epsilon.html", messages=session["messages"])
 
