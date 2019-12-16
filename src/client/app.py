@@ -83,10 +83,9 @@ def create_app(test_config=None):
                     session["messages"].append(
                         dict(sender="them", text=new_prompt())
                     )
-                    turn = QUESTION_TURN
+                    session["turn"] = QUESTION_TURN
         elif request.method == "GET":
-            message = new_prompt()
-            session["messages"] = [dict(sender="them", text=message)]
+            session["messages"] = [dict(sender="them", text=new_prompt())]
             session["turn"] = QUESTION_TURN
 
         return render_template("epsilon.html", messages=session["messages"])
