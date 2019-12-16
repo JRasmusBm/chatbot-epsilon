@@ -86,6 +86,7 @@ def generate_response(user_input):
     similar_vector_values = cosine_similarity(
         all_word_vectors[-1], all_word_vectors
     )
+    article_sentences.remove(user_input)
     similar_sentence_number = similar_vector_values.argsort()[0][-2]
     matched_vector = similar_vector_values.flatten()
     matched_vector.sort()
@@ -138,7 +139,6 @@ def run_tennis_chatbot():
                 else:
                     print("TennisRobo: ", end="")
                     print(generate_response(human_text))
-                    article_sentences.remove(human_text)
         else:
             continue_dialogue = False
             print("TennisRobo: Good bye and take care of yourself...")
