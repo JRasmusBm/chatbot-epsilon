@@ -130,9 +130,9 @@ class Sentiment:
         self.model.load_state_dict(
             torch.load(model_file, map_location=self.device)
         )
+        self.model.eval()
 
     def eval(self, sentence, min_len=5):
-        self.model.eval()
         if len(sentence.split(" ")) < min_len:
             sentence += " a" * (min_len - len(sentence.split(" ")))
         tokenized = [tok.text for tok in nlp.tokenizer(sentence)]
