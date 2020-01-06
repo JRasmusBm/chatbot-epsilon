@@ -7,5 +7,6 @@ trained_models/
 venv/
 data/
 .tmux
+.vectors_cache
 .vector_cache
 tut1-model.pt
