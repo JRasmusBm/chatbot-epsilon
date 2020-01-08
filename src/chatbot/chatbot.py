@@ -41,6 +41,7 @@ def change_sport(user_input):
     else:
         for k, v in possible_subjects.items():
             if v == subjects[similar_sentence_number]:
+                print(k)
                 read_corpus(k)
                 break
         return "I have now learned about " + user_input + "! Ask me something :)"
@@ -87,7 +88,6 @@ def generate_greeting_response(greeting):
 
 
 def generate_response(user_input):
-    epsilon_response = ''
     article_sentences.append(user_input)
 
     word_vectorizer = TfidfVectorizer(tokenizer=get_processed_text, stop_words='english')
