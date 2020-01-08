@@ -15,7 +15,7 @@ error_margin = 0.05
 
 def new_prompt():
     prompts = [
-        "Name a tennis-related topic.",
+        "Hello, I am your friend Epsilon. You can ask me anything about sport! To change subject type \"change subject\" :)",
     ]
     return choice(prompts)
 
