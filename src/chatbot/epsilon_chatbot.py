@@ -26,7 +26,6 @@ reference_sentences = []
 for p, _ in inp:
     reference_sentences.append(p)
 
-print(reference_sentences)
 
 wnlemmatizer = nltk.stem.WordNetLemmatizer()
 
