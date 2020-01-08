@@ -3,11 +3,12 @@ from random import choice
 
 from flask import Flask, render_template, request, session
 
-from src.chatbot.chatbot import generate_response
+from src.chatbot.chatbot import generate_response, change_sport
 from src.sentiment.sentiment import Sentiment
 
 QUESTION_TURN = "QUESTION"
 REVIEW_TURN = "REVIEW"
+SUBJECT_TURN = "SUBJECT"
 
 trained_models_folder = "../../trained_models"
 error_margin = 0.05
@@ -15,7 +16,7 @@ error_margin = 0.05
 
 def new_prompt():
     prompts = [
-        "Hello, I am your friend Epsilon. You can ask me anything about sport! To change subject type \"change subject\" :)",
+        "Ask me something more! Or change sport to talk about by typing \"change subject\"",
     ]
     return choice(prompts)
 
@@ -23,7 +24,7 @@ def new_prompt():
 def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_mapping(SECRET_KEY="dev")
-    sentiment = Sentiment(f"{trained_models_folder}/temp.pt")
+    sentiment = Sentiment(f"{trained_models_folder}/cnn_20_epochs_imdb.pt")
 
     if test_config is None:
         app.config.from_pyfile("config.py", silent=True)
@@ -43,16 +44,24 @@ def create_app(test_config=None):
             message = request.form["message"].strip()
             session["messages"].append(dict(sender="me", text=message))
             if session["turn"] == QUESTION_TURN:
-                session["messages"].append(
-                    dict(sender="them", text=generate_response(message),)
-                )
-                session["messages"].append(
-                    dict(
-                        sender="them",
-                        text="How do you feel about my response?",
+                if message.lower() == "change subject":
+                    session["messages"].append(dict(sender="them", text="What subject do you want to talk about?"))
+                    session["turn"] = SUBJECT_TURN
+
+                else:
+                    session["messages"].append(
+                        dict(sender="them", text=generate_response(message),)
                     )
-                )
-                session["turn"] = REVIEW_TURN
+                    session["messages"].append(
+                        dict(
+                            sender="them",
+                            text="How do you feel about my response?",
+                        )
+                    )
+                    session["turn"] = REVIEW_TURN
+            elif session["turn"] == SUBJECT_TURN:
+                session["messages"].append(dict(sender="them", text=change_sport(message.lower()).capitalize()),)
+                session["turn"] = QUESTION_TURN
             else:
                 score = sentiment.eval(message)
                 session["messages"].append(
@@ -85,7 +94,7 @@ def create_app(test_config=None):
                     )
                     session["turn"] = QUESTION_TURN
         elif request.method == "GET":
-            session["messages"] = [dict(sender="them", text=new_prompt())]
+            session["messages"] = [dict(sender="them", text= "Hello, I am your friend Epsilon. You can ask me anything about sport! To change subject type \"change subject\" :)")]
             session["turn"] = QUESTION_TURN
 
         return render_template("epsilon.html", messages=session["messages"])
