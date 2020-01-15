@@ -11,6 +11,7 @@ import torch
 import torch.nn as nn
 from torchtext import data
 from torchtext import datasets
+from transformers import BertTokenizer, BertModel
 
 SEED = 1234
 
@@ -26,56 +27,52 @@ data_folder = "../../data"
 # json_file = f"{data_folder}/amazon_cells_labelled.json"
 
 
-class CNN(nn.Module):
+tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+max_input_length = tokenizer.max_model_input_sizes["bert-base-uncased"]
+init_token_index = tokenizer.cls_token_id
+end_of_string_token_index = tokenizer.sep_token_id
+padding_token_index = tokenizer.pad_token_id
+unknown_token_index = tokenizer.unk_token_id
+
+
+def tokenize_and_cut(sentence):
+    tokens = tokenizer.tokenize(sentence)
+    tokens = tokens[: max_input_length - 2]
+    return tokens
+
+
+class BERTGRUSentiment(nn.Module):
     def __init__(
-        self,
-        vocab_size,
-        embedding_dim,
-        n_filters,
-        filter_sizes,
-        output_dim,
-        dropout,
-        pad_idx,
+        self, bert, hidden_dim, output_dim, n_layers, bidirectional, dropout
     ):
         super().__init__()
-        self.embedding = nn.Embedding(
-            vocab_size, embedding_dim, padding_idx=pad_idx
+        self.bert = bert
+        embedding_dim = self.bert.config.to_dict()["hidden_size"]
+        self.rnn = nn.GRU(
+            embedding_dim,
+            hidden_dim,
+            num_layers=n_layers,
+            bidirectional=bidirectional,
+            batch_first=True,
+            dropout=0 if n_layers < 2 else dropout,
         )
-        self.conv_0 = nn.Conv2d(
-            in_channels=1,
-            out_channels=n_filters,
-            kernel_size=(filter_sizes[0], embedding_dim),
+        self.out = nn.Linear(
+            hidden_dim * 2 if bidirectional else hidden_dim, output_dim
         )
-        self.conv_1 = nn.Conv2d(
-            in_channels=1,
-            out_channels=n_filters,
-            kernel_size=(filter_sizes[1], embedding_dim),
-        )
-        self.conv_2 = nn.Conv2d(
-            in_channels=1,
-            out_channels=n_filters,
-            kernel_size=(filter_sizes[2], embedding_dim),
-        )
-        self.fc = nn.Linear(len(filter_sizes) * n_filters, output_dim)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, text):
-        embedded = self.embedding(text)
-        embedded = embedded.unsqueeze(1)
-        conved_0 = nn.functional.relu(self.conv_0(embedded).squeeze(3))
-        conved_1 = nn.functional.relu(self.conv_1(embedded).squeeze(3))
-        conved_2 = nn.functional.relu(self.conv_2(embedded).squeeze(3))
-        pooled_0 = nn.functional.max_pool1d(
-            conved_0, conved_0.shape[2]
-        ).squeeze(2)
-        pooled_1 = nn.functional.max_pool1d(
-            conved_1, conved_1.shape[2]
-        ).squeeze(2)
-        pooled_2 = nn.functional.max_pool1d(
-            conved_2, conved_2.shape[2]
-        ).squeeze(2)
-        cat = self.dropout(torch.cat((pooled_0, pooled_1, pooled_2), dim=1))
-        return self.fc(cat)
+        with torch.no_grad():
+            embedded = self.bert(text)[0]
+        _, hidden = self.rnn(embedded)
+        if self.rnn.bidirectional:
+            hidden = self.dropout(
+                torch.cat((hidden[-2, :, :], hidden[-1, :, :]), dim=1)
+            )
+        else:
+            hidden = self.dropout(hidden[-1, :, :])
+        output = self.out(hidden)
+        return output
 
 
 MAX_VOCAB_SIZE = 25_000
@@ -90,42 +87,45 @@ class Sentiment:
     def __init__(self, model_file: str, *args, **kwargs):
         global MAX_VOCAB_SIZE
         self.device = torch.device("cpu")
-        self.TEXT = data.Field(tokenize="spacy", batch_first=True,)
-        self.LABEL = data.LabelField(dtype=torch.float)
-        self.fields = dict(
-            text=("text", self.TEXT), label=("label", self.LABEL),
+
+        self.TEXT = data.Field(
+            batch_first=True,
+            use_vocab=False,
+            preprocessing=tokenizer.convert_tokens_to_ids,
+            init_token=init_token_index,
+            eos_token=end_of_string_token_index,
+            pad_token=padding_token_index,
+            unk_token=unknown_token_index,
         )
+        self.LABEL = data.LabelField(dtype=torch.float)
         print("SPLITTING DATA")
         training_data, test_data = datasets.IMDB.splits(self.TEXT, self.LABEL)
+
         training_data, validation_data = training_data.split(
             random_state=random.seed(SEED)
         )
-        print("BUILDING VOCAB")
-        self.TEXT.build_vocab(
-            training_data,
-            vectors="glove.6B.100d",
-            unk_init=torch.Tensor.normal_,
-            max_size=MAX_VOCAB_SIZE,
+        BATCH_SIZE = 128
+        (
+            training_iterator,
+            validation_iterator,
+            test_iterator,
+        ) = data.BucketIterator.splits(
+            (training_data, validation_data, test_data),
+            batch_size=BATCH_SIZE,
+            device=self.device,
         )
-        print("DONE BUILDING VOCAB")
+        print("BUILDING VOCAB")
         self.LABEL.build_vocab(training_data)
-        INPUT_DIM = len(self.TEXT.vocab)
-        EMBEDDING_DIM = 100
-        N_FILTERS = 100
-        FILTER_SIZES = [3, 4, 5]
+        print("DONE BUILDING VOCAB")
+        HIDDEN_DIM = 256
         OUTPUT_DIM = 1
-        DROPOUT = 0.5
-        PADDING_INDEX = self.TEXT.vocab.stoi[self.TEXT.pad_token]
-        MAX_VOCAB_SIZE = 25_000
+        N_LAYERS = 2
+        BIDIRECTIONAL = True
+        DROPOUT = 0.25
 
-        self.model = CNN(
-            INPUT_DIM,
-            EMBEDDING_DIM,
-            N_FILTERS,
-            FILTER_SIZES,
-            OUTPUT_DIM,
-            DROPOUT,
-            PADDING_INDEX,
+        bert = BertModel.from_pretrained("bert-base-uncased")
+        self.model = BERTGRUSentiment(
+            bert, HIDDEN_DIM, OUTPUT_DIM, N_LAYERS, BIDIRECTIONAL, DROPOUT,
         )
         self.model.load_state_dict(
             torch.load(model_file, map_location=self.device)
@@ -135,9 +135,15 @@ class Sentiment:
     def eval(self, sentence, min_len=5):
         if len(sentence.split(" ")) < min_len:
             sentence += " a" * (min_len - len(sentence.split(" ")))
-        tokenized = [tok.text for tok in nlp.tokenizer(sentence)]
-        indexed = [self.TEXT.vocab.stoi[t] for t in tokenized]
+            self.model.eval()
+        tokens = tokenizer.tokenize(sentence)
+        tokens = tokens[: max_input_length - 2]
+        indexed = (
+            [init_token_index]
+            + tokenizer.convert_tokens_to_ids(tokens)
+            + [end_of_string_token_index]
+        )
         tensor = torch.LongTensor(indexed).to(self.device)
         tensor = tensor.unsqueeze(0)
         prediction = torch.sigmoid(self.model(tensor))
-        return prediction.item()
+        return max(prediction.item() - 0.1, 0.00001)
