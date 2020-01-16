@@ -61,7 +61,8 @@ def create_app(test_config=None):
                     session["turn"] = REVIEW_TURN
             elif session["turn"] == SUBJECT_TURN:
                 session["messages"].append(dict(sender="them", text=change_sport(message.lower()).capitalize()),)
-                session["turn"] = QUESTION_TURN
+                if "sorry" not in session["messages"][-1]["text"]:
+                  session["turn"] = QUESTION_TURN
             else:
                 score = sentiment.eval(message)
                 session["messages"].append(
@@ -94,8 +95,8 @@ def create_app(test_config=None):
                     )
                     session["turn"] = QUESTION_TURN
         elif request.method == "GET":
-            session["messages"] = [dict(sender="them", text= "Hello, I am your friend Epsilon. You can ask me anything about sport! To change subject type \"change subject\" :)")]
-            session["turn"] = QUESTION_TURN
+            session["messages"] = [dict(sender="them", text= "Hello, I am your friend Epsilon. You can ask me anything about sport! Please suggest the sport oyou want to talk about.")]
+            session["turn"] = SUBJECT_TURN
 
         return render_template("epsilon.html", messages=session["messages"])
 
